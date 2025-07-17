@@ -1,28 +1,38 @@
 const express = require('express');
-const request = require('request');
-const cors = require('cors'); // Adicione o CORS
+const axios = require('axios');
+const cors = require('cors');
 const app = express();
 
-// Habilita o CORS para todas as origens
 app.use(cors());
 
-app.get('/stream', (req, res) => {
-  const url = req.query.url;
-  if (!url) {
-    return res.status(400).send('URL is required');
-  }
+app.get('/stream', async (req, res) => {
+    const targetUrl = req.query.url;
 
-  // Passa a requisição para a URL original e envia a resposta de volta
-  try {
-    request({ url: url, headers: { 'Referer': url } }) // Adicionar um Referer pode ajudar
-      .on('error', (e) => res.status(500).send('Proxy error: ' + e.message))
-      .pipe(res);
-  } catch (e) {
-    res.status(500).send('Failed to process request.');
-  }
+    if (!targetUrl) {
+        return res.status(400).send('URL is required');
+    }
+
+    try {
+        const response = await axios({
+            method: 'get',
+            url: targetUrl,
+            responseType: 'stream',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Referer': targetUrl
+            }
+        });
+
+        res.set(response.headers);
+        response.data.pipe(res);
+
+    } catch (error) {
+        console.error('Erro no proxy:', error.message);
+        res.status(error.response?.status || 500).send('Erro ao buscar o conteúdo via proxy.');
+    }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Proxy HLS ativo na porta ${PORT}`);
+    console.log(`Proxy HLS (v2) ativo na porta ${PORT}`);
 });
